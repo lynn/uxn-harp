@@ -27,16 +27,30 @@
 ( variables )
 
 |0000
-
+@bass $2 ( A=0, Bb=1, B=2... none=ffff )
+@basstime $2 ( counts up until $00ff on new bass note )
+@chord $2 ( current chord index, none=ffff )
+@chordtime $2 ( counts up until $00ff on new chord )
 
 ( program )
 
 |0100 ( -> )
-	( theme )
+	#ffff .bass STZ2
+	#ffff .chord STZ2
+
 	#cf44 .System/r DEO2
 	#8f4d .System/g DEO2
 	#bf4b .System/b DEO2
 	;on-screen .Screen/vector DEO2
+	;on-controller .Controller/vector DEO2
+BRK
+
+@on-controller
+	.Controller/key DEI LIT 'q NEQ ,&no-bb JCN #0001 .bass STZ2 #0000 .basstime STZ2 &no-bb
+	.Controller/key DEI LIT 'w NEQ ,&no-eb JCN #0006 .bass STZ2 #0000 .basstime STZ2 &no-eb
+
+	.Controller/key DEI LIT 'y NEQ ,&no-c0 JCN #0000 .chord STZ2 #0000 .chordtime STZ2 &no-c0
+
 BRK
 
 @on-screen
@@ -52,14 +66,16 @@ BRK
 
 	#0000
 	&loop-note
+	DUP2 STH2
 	DUP2 #fffc AND2 ( ii ii/4*4 )
 	OVR2 #0003 AND2 #0005 MUL2 ( ii ii/4*3 ii%4*5 )
 	ADD2 INC2 #000c Mod2 ( ii ni )
-	#20 SFT2 ;note-table ADD2 LDA2k ( ii &notespr notespr )
-	SWP2 INC2 INC2 LDA2 ( ii notespr accspr )
-	SWP2 ROT2k NIP2 NIP2  ( ii accspr notespr ii )
-	DUP2 #0003 AND2 #0018 MUL2 #0030 ADD2 ( ii accspr notespr ii xx )
-	SWP2 #02 SFT2 #0018 MUL2 #0040 ADD2 ( ii accspr notespr xx yy )
+	DUP2 #20 SFT2 ;note-table ADD2 LDA2k ( ii ni &notespr notespr )
+	SWP2 INC2 INC2 LDA2 ( ii ni notespr accspr )
+	SWP2 ROT2  ( ii accspr notespr ni )
+	.bass LDZ2 EQU2 Ext  ( ii accspr notespr on* )
+	STH2r DUP2 #0003 AND2 #0018 MUL2 #0030 ADD2 ( ii accspr notespr on ii xx )
+	SWP2 #02 SFT2 #0018 MUL2 #0040 ADD2 ( ii accspr notespr on xx yy )
 	;draw-note-button JSR2 ( ii )
 	INC2
 	DUP2 #000c LTH2 ,&loop-note JCN
@@ -68,7 +84,7 @@ BRK
 
 @draw-chord-button ( x* y* num -> )
 	( Draw a border at x,y )
-	STH OVR2 OVR2 #01 ;draw-border JSR2 STHr
+	STH OVR2 OVR2 STHrk Ext .chord LDZ2 EQU2 ;draw-border JSR2 STHr
 
 	#30 SFT Ext      ( x* y* 8num* )
 	SWP2 Ssy         ( x* 8num* )
@@ -92,9 +108,11 @@ BRK
 	#01 Sprr
 JMP2r
 
-@draw-note-button ( accspr* notespr* x* y* -> )
+@draw-note-button ( accspr* notespr* on* x* y* -> )
 	( Draw the button border )
-	OVR2 OVR2 #00 ;draw-border JSR2
+	ROT2k NIP         ( acc* note* on* x* y* x* y* on )
+	;draw-border JSR2 ( acc* note* on* x* y* )
+	ROT2 POP2         ( acc* note* x* y* )
 
 	( Draw the note name, shifted 1px right if accidental = blank: )
 	ROT2 Ssa ( acc x y )
