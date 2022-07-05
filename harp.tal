@@ -11,8 +11,18 @@
 |b0 @File1      &vector $2 &success  $2 &stat   $2 &delete $1 &append $1 &name    $2 &length  $2 &read   $2 &write $2
 |c0 @DateTime   &year   $2 &month    $1 &day    $1 &hour   $1 &minute $1 &second  $1 &dotw    $1 &doty   $2 &isdst $1
 
-%EXT { #00 SWP } ( Extend byte to short )
-%DBG { #01 .System/debug DEO }
+%Ext { #00 SWP } ( Extend byte to short )
+%Mod2 { DIV2k MUL2 SUB2 }
+%Dbg { #01 .System/debug DEO }
+%Ssx { .Screen/x DEO2 }
+%Ssy { .Screen/y DEO2 }
+%Ssa { .Screen/addr DEO2 }
+%Spr { .Screen/sprite DEO }
+%Sprr { .Screen/sprite DEOk DEO }
+%Aut0 { #00 .Screen/auto DEO }
+%Aut0ay { #06 .Screen/auto DEO }
+%Aut1ay { #16 .Screen/auto DEO }
+%Aut1y { #12 .Screen/auto DEO }
 
 ( variables )
 
@@ -23,84 +33,101 @@
 
 |0100 ( -> )
 	( theme )
-	#cf45 .System/r DEO2
-	#8f45 .System/g DEO2
-	#bf45 .System/b DEO2
+	#cf44 .System/r DEO2
+	#8f4d .System/g DEO2
+	#bf4b .System/b DEO2
 	;on-screen .Screen/vector DEO2
 BRK
 
 @on-screen
-	#0040 #0040 #00 ;draw-chord-button JSR2
-	#0058 #0040 #01 ;draw-chord-button JSR2
-	#0070 #0040 #02 ;draw-chord-button JSR2
-	#0088 #0040 #03 ;draw-chord-button JSR2
-	#00a0 #0040 #04 ;draw-chord-button JSR2
-	#0040 #0058 #05 ;draw-chord-button JSR2
-	#0058 #0058 #06 ;draw-chord-button JSR2
-	#0070 #0058 #07 ;draw-chord-button JSR2
-	#0088 #0058 #08 ;draw-chord-button JSR2
-	#00a0 #0058 #09 ;draw-chord-button JSR2
-	#0040 #0070 #0a ;draw-chord-button JSR2
-	#0058 #0070 #0b ;draw-chord-button JSR2
-	#0070 #0070 #0c ;draw-chord-button JSR2
-	#0088 #0070 #0d ;draw-chord-button JSR2
-	#00a0 #0070 #0e ;draw-chord-button JSR2
+	#0000
+	&loop-chord
+	DUP2 #0005 Mod2 #0018 MUL2 #00c0 ADD2 ( ii xx )
+	OVR2 #0005 DIV2 #0018 MUL2 #0040 ADD2 ( ii xx yy )
+	ROT2k NIP2 NIP2 NIP ( ii xx yy i )
+	;draw-chord-button JSR2 ( ii )
+	INC2
+	DUP2 #000f LTH2 ,&loop-chord JCN
+	POP2
+
+	#0000
+	&loop-note
+	DUP2 #fffc AND2 ( ii ii/4*4 )
+	OVR2 #0003 AND2 #0005 MUL2 ( ii ii/4*3 ii%4*5 )
+	ADD2 INC2 #000c Mod2 ( ii ni )
+	#20 SFT2 ;note-table ADD2 LDA2k ( ii &notespr notespr )
+	SWP2 INC2 INC2 LDA2 ( ii notespr accspr )
+	SWP2 ROT2k NIP2 NIP2  ( ii accspr notespr ii )
+	DUP2 #0003 AND2 #0018 MUL2 #0030 ADD2 ( ii accspr notespr ii xx )
+	SWP2 #02 SFT2 #0018 MUL2 #0040 ADD2 ( ii accspr notespr xx yy )
+	;draw-note-button JSR2 ( ii )
+	INC2
+	DUP2 #000c LTH2 ,&loop-note JCN
+	POP2
 BRK
 
 @draw-chord-button ( x* y* num -> )
 	( Draw a border at x,y )
-	STH OVR2 OVR2 ;draw-border JSR2 STHr
+	STH OVR2 OVR2 #01 ;draw-border JSR2 STHr
 
-	#30 SFT #00 SWP      ( x* y* 8num* )
-	SWP2 .Screen/y DEO2  ( x* 8num* )
-	#06 .Screen/auto DEO ( x* 8num* )
-	;chords/l ADD2       ( x* &lsprt )
-	INC2k INC2 LDA2      ( x* &lsprt rsprt )
+	#30 SFT Ext      ( x* y* 8num* )
+	SWP2 Ssy         ( x* 8num* )
+	Aut0ay           ( x* 8num* )
+	;chords/l ADD2   ( x* &lsprt )
+	INC2k INC2 LDA2  ( x* &lsprt rsprt )
 
 	DUP2 #0000 EQU2 ,&no-right JCN
 		( Draw the right 1x2 sprite at [x+8,y]. )
-		.Screen/addr DEO2               ( x* &lsprt )
-		OVR2 #0008 ADD2 .Screen/x DEO2  ( x* &lsprt )
-		#01 .Screen/sprite DEOk DEO     ( x* &lsprt )
-		.Screen/y DEI2 #0010 SUB2 .Screen/y DEO2
+		Ssa                  ( x* &lsprt )
+		OVR2 #0008 ADD2 Ssx  ( x* &lsprt )
+		#01 Sprr             ( x* &lsprt )
+		.Screen/y DEI2 #0010 SUB2 Ssy
 		,&draw-left JMP
 	&no-right
-		( If no right, draw left at [x+4,y] )
+		( If no right, draw left centered, at [x+4,y] )
 		POP2 SWP2 #0004 ADD2 SWP2
 	&draw-left
-	LDA2 .Screen/addr DEO2
-	.Screen/x DEO2
-	#01 .Screen/sprite DEOk DEO
+	LDA2 Ssa
+	Ssx
+	#01 Sprr
 JMP2r
 
-@draw-border ( x* y* -> )
-	( TODO: make this less stupid? )
-	#01 .Screen/auto DEO
-	OVR2 .Screen/x DEO2
-	DUP2 #0002 SUB2 .Screen/y DEO2
-	#02 .Screen/pixel DEOk DEOk DEOk DEOk  DEOk DEOk DEOk DEOk  DEOk DEOk DEOk DEOk  DEOk DEOk DEOk DEO
-	OVR2 .Screen/x DEO2
-	DUP2 #0011 ADD2 .Screen/y DEO2
-	#02 .Screen/pixel DEOk DEOk DEOk DEOk  DEOk DEOk DEOk DEOk  DEOk DEOk DEOk DEOk  DEOk DEOk DEOk DEO
-	#02 .Screen/auto DEO
-	OVR2 #0002 SUB2 .Screen/x DEO2
-	DUP2 .Screen/y DEO2
-	#02 .Screen/pixel DEOk DEOk DEOk DEOk  DEOk DEOk DEOk DEOk  DEOk DEOk DEOk DEOk  DEOk DEOk DEOk DEO
-	OVR2 #0011 ADD2 .Screen/x DEO2
-	DUP2 .Screen/y DEO2
-	#02 .Screen/pixel DEOk DEOk DEOk DEOk  DEOk DEOk DEOk DEOk  DEOk DEOk DEOk DEOk  DEOk DEOk DEOk DEO
+@draw-note-button ( accspr* notespr* x* y* -> )
+	( Draw the button border )
+	OVR2 OVR2 #00 ;draw-border JSR2
 
-	( Corners )
-	#00 .Screen/auto DEO
-	OVR2 #0001 SUB2 .Screen/x DEO2
-	DUP2 #0001 SUB2 .Screen/y DEO2
-	#02 .Screen/pixel DEO
-	DUP2 #0010 ADD2 .Screen/y DEO2
-	#02 .Screen/pixel DEO
-	OVR2 #0010 ADD2 .Screen/x DEO2
-	#02 .Screen/pixel DEO
-	DUP2 #0001 SUB2 .Screen/y DEO2
-	#02 .Screen/pixel DEO
+	( Draw the note name, shifted 1px right if accidental = blank: )
+	ROT2 Ssa ( acc x y )
+	ROT2k ;s1x1_blank EQU2 Ext ( acc x y x y acc=blank )
+	ROT2 ADD2 Ssx ( acc x y y )
+	Ssy ( acc x y )
+	Aut1ay #01 Sprr  ( acc x y )
+
+	( Draw the accidental: )
+	Ssy #0008 ADD2 Ssx Ssa ( )
+	Aut0 #41 Spr
+JMP2r
+
+@draw-border ( x* y* on -> )
+	#02 SWP SUB STH
+	;s2x1_solid Ssa
+
+	( Draw at 8 locations in a 2px rhombus around x,y: )
+	Aut1y
+	OVR2            Ssx DUP2 #0002 SUB2 Ssy STHrk Sprr
+	OVR2 #0001 SUB2 Ssx DUP2 #0001 SUB2 Ssy STHrk Sprr
+	OVR2 #0002 SUB2 Ssx DUP2            Ssy STHrk Sprr
+	OVR2 #0001 SUB2 Ssx DUP2 INC2       Ssy STHrk Sprr
+	OVR2            Ssx DUP2 INC2 INC2  Ssy STHrk Sprr
+	OVR2 INC2       Ssx DUP2 INC2       Ssy STHrk Sprr
+	OVR2 INC2 INC2  Ssx DUP2            Ssy STHrk Sprr
+	OVR2 INC2       Ssx DUP2 #0001 SUB2 Ssy STHr  Sprr
+
+	( Draw at 4 more locations in a 1px rhombus: )
+	OVR2            Ssx DUP2 #0001 SUB2 Ssy #00 Sprr
+	OVR2 #0001 SUB2 Ssx DUP2            Ssy #00 Sprr
+	OVR2            Ssx DUP2 INC2       Ssy #00 Sprr
+	OVR2 INC2       Ssx DUP2            Ssy #00 Sprr
 
 	POP2 POP2
 JMP2r
@@ -124,6 +151,20 @@ JMP2r
 	06 0a 0c 0f     :s1x2_sdim :s1x2_7
 	06 09 0c 0f     :s1x2_dim  :s1x2_7
 	09 0e 0c 12     :s1x2_iil  :s1x2_iir
+
+@note-table
+	:s2x2_note/a  :s1x1_blank
+	:s2x2_note/b  :s1x1_flat
+	:s2x2_note/b  :s1x1_blank
+	:s2x2_note/c  :s1x1_blank
+	:s2x2_note/d  :s1x1_flat
+	:s2x2_note/d  :s1x1_blank
+	:s2x2_note/e  :s1x1_flat
+	:s2x2_note/e  :s1x1_blank
+	:s2x2_note/f  :s1x1_blank
+	:s2x2_note/f  :s1x1_sharp
+	:s2x2_note/g  :s1x1_blank
+	:s2x2_note/a  :s1x1_flat
 
 @s2x2_note
 &a
@@ -161,6 +202,8 @@ JMP2r
 	0000 e0e0 6060 0000
 	c0c1 c0c0 6030 1f00
 	00f0 6060 60e0 6000
+@s1x1_blank
+	0000 0000 0000 0000
 @s1x1_flat
 	0808 0e0a 0a0c 0800
 @s1x1_sharp
@@ -186,12 +229,9 @@ JMP2r
 @s1x2_m
 	0000 0000 0000 00b6
 	dbdb dbdb db00 0000
-@s1x1_btop
-	0000 0000 00ff 0000
-@s1x1_corner
-	0000 0000 0000 0102
-@s1x1_bleft
-	0404 0404 0404 0404
+@s2x1_solid
+	ffff ffff ffff ffff
+	ffff ffff ffff ffff
 @s1x2_sdim
 	0000 0003 1e37 3f3b
 	1e30 0000 0000 0000
@@ -202,8 +242,8 @@ JMP2r
 	0000 0000 1e30 6060
 	7c66 6666 3c00 0000
 @s1x2_s
-	0000 0000 0000 7cc4
-	c078 0c8c f800 0000
+	0000 0000 0000 3e62
+	603c 0646 7c00 0000
 @s1x2_iil
 	0000 0000 7f33 3333
 	3333 3333 7f00 0000
