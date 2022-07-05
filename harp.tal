@@ -11,18 +11,202 @@
 |b0 @File1      &vector $2 &success  $2 &stat   $2 &delete $1 &append $1 &name    $2 &length  $2 &read   $2 &write $2
 |c0 @DateTime   &year   $2 &month    $1 &day    $1 &hour   $1 &minute $1 &second  $1 &dotw    $1 &doty   $2 &isdst $1
 
+%EXT { #00 SWP } ( Extend byte to short )
+%DBG { #01 .System/debug DEO }
+
 ( variables )
 
 |0000
 
+
 ( program )
 
 |0100 ( -> )
-
 	( theme )
-	#0fe5 .System/r DEO2
-	#0fc5 .System/g DEO2
-	#2f25 .System/b DEO2
-
+	#cf45 .System/r DEO2
+	#8f45 .System/g DEO2
+	#bf45 .System/b DEO2
+	;on-screen .Screen/vector DEO2
 BRK
 
+@on-screen
+	#0040 #0040 #00 ;draw-chord-button JSR2
+	#0058 #0040 #01 ;draw-chord-button JSR2
+	#0070 #0040 #02 ;draw-chord-button JSR2
+	#0088 #0040 #03 ;draw-chord-button JSR2
+	#00a0 #0040 #04 ;draw-chord-button JSR2
+	#0040 #0058 #05 ;draw-chord-button JSR2
+	#0058 #0058 #06 ;draw-chord-button JSR2
+	#0070 #0058 #07 ;draw-chord-button JSR2
+	#0088 #0058 #08 ;draw-chord-button JSR2
+	#00a0 #0058 #09 ;draw-chord-button JSR2
+	#0040 #0070 #0a ;draw-chord-button JSR2
+	#0058 #0070 #0b ;draw-chord-button JSR2
+	#0070 #0070 #0c ;draw-chord-button JSR2
+	#0088 #0070 #0d ;draw-chord-button JSR2
+	#00a0 #0070 #0e ;draw-chord-button JSR2
+BRK
+
+@draw-chord-button ( x* y* num -> )
+	( Draw a border at x,y )
+	STH OVR2 OVR2 ;draw-border JSR2 STHr
+
+	#30 SFT #00 SWP      ( x* y* 8num* )
+	SWP2 .Screen/y DEO2  ( x* 8num* )
+	#06 .Screen/auto DEO ( x* 8num* )
+	;chords/l ADD2       ( x* &lsprt )
+	INC2k INC2 LDA2      ( x* &lsprt rsprt )
+
+	DUP2 #0000 EQU2 ,&no-right JCN
+		( Draw the right 1x2 sprite at [x+8,y]. )
+		.Screen/addr DEO2               ( x* &lsprt )
+		OVR2 #0008 ADD2 .Screen/x DEO2  ( x* &lsprt )
+		#01 .Screen/sprite DEOk DEO     ( x* &lsprt )
+		.Screen/y DEI2 #0010 SUB2 .Screen/y DEO2
+		,&draw-left JMP
+	&no-right
+		( If no right, draw left at [x+4,y] )
+		POP2 SWP2 #0004 ADD2 SWP2
+	&draw-left
+	LDA2 .Screen/addr DEO2
+	.Screen/x DEO2
+	#01 .Screen/sprite DEOk DEO
+JMP2r
+
+@draw-border ( x* y* -> )
+	( TODO: make this less stupid? )
+	#01 .Screen/auto DEO
+	OVR2 .Screen/x DEO2
+	DUP2 #0002 SUB2 .Screen/y DEO2
+	#02 .Screen/pixel DEOk DEOk DEOk DEOk  DEOk DEOk DEOk DEOk  DEOk DEOk DEOk DEOk  DEOk DEOk DEOk DEO
+	OVR2 .Screen/x DEO2
+	DUP2 #0011 ADD2 .Screen/y DEO2
+	#02 .Screen/pixel DEOk DEOk DEOk DEOk  DEOk DEOk DEOk DEOk  DEOk DEOk DEOk DEOk  DEOk DEOk DEOk DEO
+	#02 .Screen/auto DEO
+	OVR2 #0002 SUB2 .Screen/x DEO2
+	DUP2 .Screen/y DEO2
+	#02 .Screen/pixel DEOk DEOk DEOk DEOk  DEOk DEOk DEOk DEOk  DEOk DEOk DEOk DEOk  DEOk DEOk DEOk DEO
+	OVR2 #0011 ADD2 .Screen/x DEO2
+	DUP2 .Screen/y DEO2
+	#02 .Screen/pixel DEOk DEOk DEOk DEOk  DEOk DEOk DEOk DEOk  DEOk DEOk DEOk DEOk  DEOk DEOk DEOk DEO
+
+	( Corners )
+	#00 .Screen/auto DEO
+	OVR2 #0001 SUB2 .Screen/x DEO2
+	DUP2 #0001 SUB2 .Screen/y DEO2
+	#02 .Screen/pixel DEO
+	DUP2 #0010 ADD2 .Screen/y DEO2
+	#02 .Screen/pixel DEO
+	OVR2 #0010 ADD2 .Screen/x DEO2
+	#02 .Screen/pixel DEO
+	DUP2 #0001 SUB2 .Screen/y DEO2
+	#02 .Screen/pixel DEO
+
+	POP2 POP2
+JMP2r
+
+@chords
+	( notes         left sprt  right sprt )
+	07 0b 0e 10  &l :s1x2_maj7 :s1x2_9
+	07 0a 0e 0f     :s1x2_m    :s1x2_9
+	07 0a 0c 11     :s1x2_7    :s1x2_s
+	07 0a 0d 10     :s1x2_7    :s1x2_flat9
+	0a 0e 11 15     :s1x2_13   :s1x2_s
+
+	07 0b 0c 10     :s1x2_maj7 0000
+	07 0a 0c 0f     :s1x2_m    :s1x2_7
+	07 0a 0c 10     :s1x2_7    0000
+	08 0a 0c 10     :s1x2_7    :s1x2_sharp5
+	0a 0e 10 15     :s1x2_13   0000
+
+	07 09 0c 10     :s1x2_6    0000
+	07 09 0c 0f     :s1x2_m    :s1x2_6
+	06 0a 0c 0f     :s1x2_sdim :s1x2_7
+	06 09 0c 0f     :s1x2_dim  :s1x2_7
+	09 0e 0c 12     :s1x2_iil  :s1x2_iir
+
+@s2x2_note
+&a
+	0000 0203 0705 0908
+	0000 0000 0080 80c0
+	1010 3f20 4040 e000
+	c060 e030 3018 3c00
+&b
+	0000 ff61 6060 6061
+	0000 0080 c0c0 8000
+	7f61 6060 6061 ff00
+	0080 c0c0 c080 0000
+&c
+	0000 1f30 60c0 c0c0
+	0000 e0e0 6060 0000
+	c0c0 c0c0 6030 1f00
+	0000 0000 60c0 8000
+&d
+	0000 ff61 6060 6060
+	0000 0080 c060 6060
+	6060 6060 6061 ff00
+	6060 6060 c080 0000
+&e
+	0000 ff60 6060 6061
+	0000 e060 0000 0000
+	7f61 6060 6060 ff00
+	0000 0000 0060 e000
+&f
+	0000 ff60 6060 6061
+	0000 e060 0000 0000
+	7f61 6060 6060 f000
+	0000 0000 0000 0000
+&g
+	0000 1f30 60c0 c0c0
+	0000 e0e0 6060 0000
+	c0c1 c0c0 6030 1f00
+	00f0 6060 60e0 6000
+@s1x1_flat
+	0808 0e0a 0a0c 0800
+@s1x1_sharp
+	0a1f 0a0a 1f0a 0000
+@s1x2_7
+	0000 0000 7e46 060c
+	0c18 1830 3000 0000
+@s1x2_13
+	0000 0000 dfc2 c6cc
+	dec3 c3c6 dc00 0000
+@s1x2_sharp5
+	0057 f456 51f1 5600
+	0000 0000 0000 0000
+@s1x2_flat9
+	0046 4575 5361 4600
+	0000 0000 0000 0000
+@s1x2_maj7
+	0000 0000 1818 3c3c
+	6666 c3c3 ff00 0000
+@s1x2_9
+	0000 0000 3c66 6666
+	3e06 060c 7800 0000
+@s1x2_m
+	0000 0000 0000 00b6
+	dbdb dbdb db00 0000
+@s1x1_btop
+	0000 0000 00ff 0000
+@s1x1_corner
+	0000 0000 0000 0102
+@s1x1_bleft
+	0404 0404 0404 0404
+@s1x2_sdim
+	0000 0003 1e37 3f3b
+	1e30 0000 0000 0000
+@s1x2_dim
+	0000 0000 1e33 3333
+	1e00 0000 0000 0000
+@s1x2_6
+	0000 0000 1e30 6060
+	7c66 6666 3c00 0000
+@s1x2_s
+	0000 0000 0000 7cc4
+	c078 0c8c f800 0000
+@s1x2_iil
+	0000 0000 7f33 3333
+	3333 3333 7f00 0000
+@s1x2_iir
+	0000 0006 860c 0c0c
+	1818 1830 b030 0000
