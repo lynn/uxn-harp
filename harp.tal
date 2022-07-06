@@ -45,6 +45,8 @@
 	#5f4f .System/r DEO2
 	#af4e .System/g DEO2
 	#9f42 .System/b DEO2
+	#00f8 .Screen/width DEO2
+	#0068 .Screen/height DEO2
 
 	( bass parameters )
 	#0121 .Audio0/adsr DEO2
@@ -121,8 +123,8 @@ BRK
 @on-screen
 	#0000
 	&loop-chord
-	DUP2 #0005 Mod2 #0018 MUL2 #00c0 ADD2 ( ii xx )
-	OVR2 #0005 DIV2 #0018 MUL2 #0040 ADD2 ( ii xx yy )
+	DUP2 #0005 Mod2 #0018 MUL2 #0080 ADD2 ( ii xx )
+	OVR2 #0005 DIV2 #0018 MUL2 #0008 ADD2 ( ii xx yy )
 	ROT2k NIP2 NIP2 NIP ( ii xx yy i )
 	;draw-chord-button JSR2 ( ii )
 	INC2
@@ -139,8 +141,8 @@ BRK
 	SWP2 INC2 INC2 LDA2 ( ii ni notespr accspr )
 	SWP2 ROT2  ( ii accspr notespr ni )
 	.bass LDZ2 EQU2 Ext  ( ii accspr notespr on* )
-	STH2r DUP2 #0003 AND2 #0018 MUL2 #0030 ADD2 ( ii accspr notespr on ii xx )
-	SWP2 #02 SFT2 #0018 MUL2 #0040 ADD2 ( ii accspr notespr on xx yy )
+	STH2r DUP2 #0003 AND2 #0018 MUL2 #0008 ADD2 ( ii accspr notespr on ii xx )
+	SWP2 #02 SFT2 #0018 MUL2 #0008 ADD2 ( ii accspr notespr on xx yy )
 	;draw-note-button JSR2 ( ii )
 	INC2
 	DUP2 #000c LTH2 ,&loop-note JCN
