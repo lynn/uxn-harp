@@ -116,7 +116,7 @@ BRK
 		MUL ADD
 
 	( Wrap to an octave )
-	#02 ADD #0c Mod #37 ADD
+	INC INC #0c Mod #37 ADD
 	.Audio0/pitch DEO
 
 	( Set a timer: after 2 frames, drop bass pitch by an octave. )
@@ -138,7 +138,7 @@ JMP2r
 	( Draw bass buttons: )
 	#0000
 	&loop-note
-	DUP2 STH2
+	STH2k
 	DUP2 #fffc AND2 ( ii ii/4*4 )
 	OVR2 #0003 AND2 #0005 MUL2 ( ii ii/4*3 ii%4*5 )
 	ADD2 INC2 #000c Mod2 ( ii ni )
@@ -162,7 +162,7 @@ JMP2r
 		DUP2    ;chords ADD2 LDA Ext .bass/which LDZ2 ADD2 NIP #0c Mod #45 ADD .Audio1/pitch DEO
 		#02 EOR ;chords ADD2 LDA Ext .bass/which LDZ2 ADD2 NIP #0c Mod #45 ADD .Audio2/pitch DEO
 	&gap
-	DUP2 NIP #01 SUB #10 MUL .Audio1/volume DEO
+	DUP2 NIP #01 SUB #40 SFT .Audio1/volume DEO
 	DUP2 NIP #01 SUB #01 MUL .Audio2/volume DEO
 	DUP2 #0001 SUB2 .chord/time STZ2
 	&chord-silent
@@ -171,7 +171,7 @@ JMP2r
 	.bass/slap LDZ2
 	DUP2 #0000 EQU2 ,&no-slap JCN
 	#0001 SUB2 DUP2 .bass/slap STZ2
-	DUP2 #0000 NEQ2 ,&no-slap-effect JCN
+	ORAk ,&no-slap-effect JCN
 	.Audio0/pitch DEI #0c SUB .Audio0/pitch DEO
 	.bass/which LDZ2 #8000 ORA2 .bass/which STZ2
 	&no-slap-effect
@@ -236,16 +236,16 @@ JMP2r
 	OVR2            Ssx DUP2 #0002 SUB2 Ssy STHrk Sprr  (   d===   )
 	OVR2 #0001 SUB2 Ssx DUP2 #0001 SUB2 Ssy STHrk Sprr  (  d=d===  )
 	OVR2 #0002 SUB2 Ssx DUP2            Ssy STHrk Sprr  ( d===d=== )
-	OVR2 #0001 SUB2 Ssx DUP2 INC2       Ssy STHrk Sprr  ( =d=d==== )
-	OVR2            Ssx DUP2 INC2 INC2  Ssy STHrk Sprr  ( ==d===== )
-	OVR2 INC2       Ssx DUP2 INC2       Ssy STHrk Sprr  ( ======== )
+	OVR2 #0001 SUB2 Ssx INC2k           Ssy STHrk Sprr  ( =d=d==== )
+	OVR2            Ssx INC2k     INC2  Ssy STHrk Sprr  ( ==d===== )
+	OVR2 INC2       Ssx INC2k           Ssy STHrk Sprr  ( ======== )
 	OVR2 INC2 INC2  Ssx DUP2            Ssy STHrk Sprr  (  ======  )
 	OVR2 INC2       Ssx DUP2 #0001 SUB2 Ssy STHr  Sprr  (   ====   )
 
 	( Now Erase at 4 locations in a 1px rhombus: )      (   ====   )
 	OVR2            Ssx DUP2 #0001 SUB2 Ssy #00 Sprr    (  =e   =  )
 	OVR2 #0001 SUB2 Ssx DUP2            Ssy #00 Sprr    ( =e e   = )
-	OVR2            Ssx DUP2 INC2       Ssy #00 Sprr    ( = e    = )
+	OVR2            Ssx INC2k           Ssy #00 Sprr    ( = e    = )
 	OVR2 INC2       Ssx DUP2            Ssy #00 Sprr    ( =      = )
 	                                                    ( =      = )
 	                                                    (  =    =  )
