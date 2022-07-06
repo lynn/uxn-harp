@@ -29,12 +29,13 @@
 
 |0000
 @bass
-	&which $2 ( A=0, Bb=1, B=2... none=800x )
-	&slap $2 ( counts down, lower pitch by an octave when it runs out )
+	&which $2 ( A=0, Bb=1, B=2... no highlight=800x )
+	&slap $2  ( Timer, lower pitch by an octave when it runs out )
 @chord
-	&which $2 ( current chord index, none=ffff )
-	&time $2  ( counts down on new chord )
-@on ( for drawing labels )
+	&which $2 ( Current chord index, none=ffff )
+	&time $2  ( Timer, used for arpeggio + volume )
+
+@on $1 ( for drawing labels )
 
 ( program )
 
@@ -48,32 +49,33 @@
 	#00f8 .Screen/width DEO2
 	#0068 .Screen/height DEO2
 
-	( bass parameters )
+	( Bass channel )
 	#0121 .Audio0/adsr DEO2
 	#0020 .Audio0/length DEO2
 	;tri-wave .Audio0/addr DEO2
 	#ff .Audio0/volume DEO
 
-	( chord parameters )
+	( Chord channel left )
 	#0010 .Audio1/adsr DEO2
 	#0020 .Audio1/length DEO2
 	;tri-wave .Audio1/addr DEO2
 	#88 .Audio1/volume DEO
 
+	( Chord channel right )
 	#0010 .Audio2/adsr DEO2
 	#0020 .Audio2/length DEO2
 	;tri-wave .Audio2/addr DEO2
 	#88 .Audio2/volume DEO
 
 	;on-controller .Controller/vector DEO2
-	;on-bass-end .Audio0/vector DEO2
 	;on-screen .Screen/vector DEO2
 BRK
 
 @bass-keys  "vqxdrawcfzse
 @chord-keys "yuiophjkl;nm,./
 
-@on-controller
+@on-controller ( -> )
+	( Loop over bass note buttons: )
 	#0000
 	&bass-loop
 	DUP2 ;bass-keys ADD2 LDA
@@ -84,11 +86,13 @@ BRK
 	INC2 DUP2 #000c LTH2 ,&bass-loop JCN
 	POP2
 
+	( Handle space bar = fifth: )
 	.Controller/key DEI #20 NEQ ,&no-fifth JCN
 	.bass/which LDZ2 #7fff AND2 .bass/which STZ2
 	;pluck-bass JSR2
 	&no-fifth
 
+	( Loop over chord buttons: )
 	#0000
 	&chord-loop
 	DUP2 ;chord-keys ADD2 LDA
@@ -99,28 +103,28 @@ BRK
 	POP2
 BRK
 
-@pluck-bass
+@pluck-bass ( -> )
+	( Get bass semitones )
 	.bass/which LDZ2 NIP
+
+	( If spacebar was pressed, lower by a fifth: )
 	.Controller/key DEI #20 EQU
 		#07 
-			( Get the first note of the current chord... )
-			#0140
+			( Subtract 1 (making a tritone) if chords[current][0] == 6 or 8. )
+			#0140  ( 1<<6 | 1<<8 )
 			.chord/which LDZ2 #30 SFT ;chords ADD2 LDA SFT2 #0001 AND2 #0001 EQU2 SUB
 		MUL ADD
-	#0c Mod
 
-	( #2d ADD )
-	#02 ADD #0c Mod #2b ADD
-	#0c ADD
+	( Wrap to an octave )
+	#02 ADD #0c Mod #37 ADD
 	.Audio0/pitch DEO
+
+	( Set a timer: after 2 frames, drop bass pitch by an octave. )
 	#0002 .bass/slap STZ2
 JMP2r
 
-@on-bass-end
-	.bass/which LDZ2 #8000 ORA2 .bass/which STZ2
-BRK
-
-@on-screen
+@on-screen ( -> )
+	( Draw chord buttons: )
 	#0000
 	&loop-chord
 	DUP2 #0005 Mod2 #0018 MUL2 #0080 ADD2 ( ii xx )
@@ -131,6 +135,7 @@ BRK
 	DUP2 #000f LTH2 ,&loop-chord JCN
 	POP2
 
+	( Draw bass buttons: )
 	#0000
 	&loop-note
 	DUP2 STH2
@@ -148,25 +153,19 @@ BRK
 	DUP2 #000c LTH2 ,&loop-note JCN
 	POP2
 
+	( Play chord arpeggio: )
 	.chord/time LDZ2
-	DUP2 #0000 EQU2 ;chord-silent JCN2
+	DUP2 #0000 EQU2 ,&chord-silent JCN
 	DUP2 #0001 AND2 NIP ,&gap JCN
-	
-	DUP2 #0007 AND2 #01 SFT2 #02 EOR
-	.chord/which LDZ2 #30 SFT2 ADD2 ;chords ADD2 LDA Ext
-	.bass/which LDZ2 ADD2
-	NIP #0c Mod #0c ADD #39 ADD .Audio1/pitch DEO
-	
-	DUP2 #0007 AND2 #01 SFT2 #03 EOR
-	.chord/which LDZ2 #30 SFT2 ADD2 ;chords ADD2 LDA Ext
-	.bass/which LDZ2 ADD2
-	NIP #0c Mod #0c ADD #39 ADD .Audio2/pitch DEO
-	
+		DUP2 #0007 AND2 #01 SFT2
+		.chord/which LDZ2 #30 SFT2 ADD2
+		DUP2    ;chords ADD2 LDA Ext .bass/which LDZ2 ADD2 NIP #0c Mod #45 ADD .Audio1/pitch DEO
+		#02 EOR ;chords ADD2 LDA Ext .bass/which LDZ2 ADD2 NIP #0c Mod #45 ADD .Audio2/pitch DEO
 	&gap
 	DUP2 NIP #01 SUB #10 MUL .Audio1/volume DEO
 	DUP2 NIP #01 SUB #01 MUL .Audio2/volume DEO
 	DUP2 #0001 SUB2 .chord/time STZ2
-	@chord-silent
+	&chord-silent
 	POP2
 
 	.bass/slap LDZ2
@@ -232,24 +231,25 @@ JMP2r
 	#02 SWP SUB STH
 	;s2x1_solid Ssa
 
-	( Draw at 8 locations in a 2px rhombus around x,y: )
+	( Stamp the border-color at 8 locations in a 2px rhombus around x,y: )
 	Aut1y
-	OVR2            Ssx DUP2 #0002 SUB2 Ssy STHrk Sprr
-	OVR2 #0001 SUB2 Ssx DUP2 #0001 SUB2 Ssy STHrk Sprr
-	OVR2 #0002 SUB2 Ssx DUP2            Ssy STHrk Sprr
-	OVR2 #0001 SUB2 Ssx DUP2 INC2       Ssy STHrk Sprr
-	OVR2            Ssx DUP2 INC2 INC2  Ssy STHrk Sprr
-	OVR2 INC2       Ssx DUP2 INC2       Ssy STHrk Sprr
-	OVR2 INC2 INC2  Ssx DUP2            Ssy STHrk Sprr
-	OVR2 INC2       Ssx DUP2 #0001 SUB2 Ssy STHr  Sprr
+	OVR2            Ssx DUP2 #0002 SUB2 Ssy STHrk Sprr  (   d===   )
+	OVR2 #0001 SUB2 Ssx DUP2 #0001 SUB2 Ssy STHrk Sprr  (  d=d===  )
+	OVR2 #0002 SUB2 Ssx DUP2            Ssy STHrk Sprr  ( d===d=== )
+	OVR2 #0001 SUB2 Ssx DUP2 INC2       Ssy STHrk Sprr  ( =d=d==== )
+	OVR2            Ssx DUP2 INC2 INC2  Ssy STHrk Sprr  ( ==d===== )
+	OVR2 INC2       Ssx DUP2 INC2       Ssy STHrk Sprr  ( ======== )
+	OVR2 INC2 INC2  Ssx DUP2            Ssy STHrk Sprr  (  ======  )
+	OVR2 INC2       Ssx DUP2 #0001 SUB2 Ssy STHr  Sprr  (   ====   )
 
-	( Draw at 4 more locations in a 1px rhombus: )
-	OVR2            Ssx DUP2 #0001 SUB2 Ssy #00 Sprr
-	OVR2 #0001 SUB2 Ssx DUP2            Ssy #00 Sprr
-	OVR2            Ssx DUP2 INC2       Ssy #00 Sprr
-	OVR2 INC2       Ssx DUP2            Ssy #00 Sprr
-
-	POP2 POP2
+	( Now Erase at 4 locations in a 1px rhombus: )      (   ====   )
+	OVR2            Ssx DUP2 #0001 SUB2 Ssy #00 Sprr    (  =e   =  )
+	OVR2 #0001 SUB2 Ssx DUP2            Ssy #00 Sprr    ( =e e   = )
+	OVR2            Ssx DUP2 INC2       Ssy #00 Sprr    ( = e    = )
+	OVR2 INC2       Ssx DUP2            Ssy #00 Sprr    ( =      = )
+	                                                    ( =      = )
+	                                                    (  =    =  )
+	POP2 POP2                                           (   ====   )
 JMP2r
 
 @chords
