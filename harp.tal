@@ -42,8 +42,7 @@
 ( program )
 
 |0100 ( -> )
-	#8000 .bass/which STZ2
-	#8000 .chord/which STZ2
+	#8000 DUP2 .bass/which STZ2 .chord/which STZ2
 
 	#5f4f .System/r DEO2
 	#af4e .System/g DEO2
@@ -57,17 +56,11 @@
 	;tri-wave .Audio0/addr DEO2
 	#ff .Audio0/volume DEO
 
-	( Chord channel left )
-	#0010 .Audio1/adsr DEO2
-	#0020 .Audio1/length DEO2
-	;tri-wave .Audio1/addr DEO2
-	#88 .Audio1/volume DEO
-
-	( Chord channel right )
-	#0010 .Audio2/adsr DEO2
-	#0020 .Audio2/length DEO2
-	;tri-wave .Audio2/addr DEO2
-	#88 .Audio2/volume DEO
+	( Chord channels )
+	#0010 DUP2 .Audio1/adsr DEO2 .Audio2/adsr DEO2
+	#0020 DUP2 .Audio1/length DEO2 .Audio2/length DEO2
+	;tri-wave DUP2 .Audio1/addr DEO2 .Audio2/addr DEO2
+	#88 DUP .Audio1/volume DEO .Audio2/volume DEO
 
 	( Initial draw of chord buttons: )
 	#0000
@@ -87,6 +80,7 @@
 
 	;on-controller .Controller/vector DEO2
 	;on-screen .Screen/vector DEO2
+	;on-mouse .Mouse/vector DEO2
 BRK
 
 @bass-keys  "vqxdrawcfzse
@@ -98,9 +92,7 @@ BRK
 	&bass-loop
 	DUP2 ;bass-keys ADD2 LDA
 	.Controller/key DEI NEQ ,&no-bass JCN
-	.bass/which LDZ2 #00 .on STZ #01 ;draw-bass-button JSR2
-	DUP2 .bass/which STZ2
-	;pluck-bass JSR2
+	DUP2 ;set-bass JSR2
 	&no-bass
 	INC2 DUP2 #000c LTH2 ,&bass-loop JCN
 	POP2
@@ -121,6 +113,19 @@ BRK
 	&no-chord
 	INC2 DUP2 #000f LTH2 ,&chord-loop JCN
 	POP2
+BRK
+
+@set-bass ( note* -> )
+	.bass/which LDZ2 #00 .on STZ #01 ;draw-bass-button JSR2
+	.bass/which STZ2
+	;pluck-bass JSR2
+JMP2r
+
+@on-mouse
+	.Mouse/state DEI ,&yes-mouse JCN BRK
+	&yes-mouse
+	( .Mouse/y DEI2 #000e Mod2 ;set-bass JSR2 )
+	( TODO )
 BRK
 
 @pluck-bass ( -> )
@@ -146,6 +151,10 @@ BRK
 	#0010 .bass/time STZ2
 JMP2r
 
+@get-chord-pitch ( arp-idx* -> midi-pitch )
+	;chords ADD2 LDA Ext .bass/which LDZ2 ADD2 NIP #0c Mod #45 ADD
+JMP2r
+
 @on-screen ( -> )
 	( Play chord arpeggio: )
 	.chord/time LDZ2
@@ -153,14 +162,14 @@ JMP2r
 		DUP2 #000a NEQ2 ,&no-unflash JCN
 			.chord/which LDZ2 #01 .on STZ #01 ;draw-chord-button JSR2
 		&no-unflash
-		DUP2 #0001 AND2 NIP ,&no-arp JCN
+		DUP2 NIP #01 AND ,&no-arp JCN
 			DUP2 #0007 AND2 #01 SFT2
 			.chord/which LDZ2 #30 SFT2 ADD2
-			DUP2    ;chords ADD2 LDA Ext .bass/which LDZ2 ADD2 NIP #0c Mod #45 ADD .Audio1/pitch DEO
-			#02 EOR ;chords ADD2 LDA Ext .bass/which LDZ2 ADD2 NIP #0c Mod #45 ADD .Audio2/pitch DEO
+			DUP2    ;get-chord-pitch JSR2 .Audio1/pitch DEO
+			#02 EOR ;get-chord-pitch JSR2 .Audio2/pitch DEO
 		&no-arp
 		DUP2 NIP #01 SUB #40 SFT .Audio1/volume DEO
-		DUP2 NIP #01 SUB #01 MUL .Audio2/volume DEO
+		DUP2 NIP #01 SUB .Audio2/volume DEO
 		DUP2 #0001 SUB2 .chord/time STZ2
 	&chord-silent
 	POP2
@@ -314,8 +323,6 @@ JMP2r
 	0000 e0e0 6060 0000
 	c0c1 c0c0 6030 1f00
 	00f0 6060 60e0 6000
-@s1x1_blank
-	0000 0000 0000 0000
 @s1x1_flat
 	0808 0e0a 0a0c 0800
 @s1x1_sharp
@@ -364,7 +371,7 @@ JMP2r
 	ff00 0000 0000 0000
 	c020 1010 1010 1010
 	8080 8080 8080 8080
-	0000 0000 0000 0000
+	@s1x1_blank 0000 0000 0000 0000
 	1010 1010 1010 1010
 	8080 403f 0000 0000
 	0000 00ff 0000 0000
@@ -376,3 +383,14 @@ JMP2r
 @tri-wave
 	80 90 a0 b0 c0 d0 e0 f0 ff f0 e0 d0 c0 b0 a0 90
 	80 70 60 50 40 30 20 10 00 10 20 30 40 50 60 70
+
+@s1x2_note
+	&a     0000 003e 6363 637f 6363 6363 0000 0000
+	&b     0000 007e 6363 637e 6363 637e 0000 0000
+	&c     0000 003e 6360 6060 6060 633e 0000 0000
+	&d     0000 007c 6663 6363 6363 667c 0000 0000
+	&e     0000 007e 6060 607c 6060 607e 0000 0000
+	&f     0000 007e 6060 607c 6060 6060 0000 0000
+	&g     0000 003e 6360 606f 6363 633e 0000 0000
+	&flat  0000 2020 3828 2830 2000 0000 0000 0000
+	&sharp 0000 50f8 5050 f850 0000 0000 0000 0000
