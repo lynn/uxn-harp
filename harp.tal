@@ -20,9 +20,11 @@
 %Ssa { .Screen/addr DEO2 }
 %Spr { .Screen/sprite DEO }
 %Sprr { .Screen/sprite DEOk DEO }
+%Sprrr { .Screen/sprite DEOk DEOk DEO }
 %Aut0 { #00 .Screen/auto DEO }
 %Aut0ay { #06 .Screen/auto DEO }
 %Aut1ay { #16 .Screen/auto DEO }
+%Aut2ay { #26 .Screen/auto DEO }
 %Aut1y { #12 .Screen/auto DEO }
 
 ( variables )
@@ -235,28 +237,13 @@ JMP2r
 JMP2r
 
 @draw-border ( x* y* -> )
-	#02 .on LDZ SUB STH
-	;s2x1_solid Ssa
-
-	( Stamp the border-color at 8 locations in a 2px rhombus around x,y: )
-	Aut1y
-	OVR2            Ssx DUP2 #0002 SUB2 Ssy STHrk Sprr  (   d===   )
-	OVR2 #0001 SUB2 Ssx DUP2 #0001 SUB2 Ssy STHrk Sprr  (  d=d===  )
-	OVR2 #0002 SUB2 Ssx DUP2            Ssy STHrk Sprr  ( d===d=== )
-	OVR2 #0001 SUB2 Ssx INC2k           Ssy STHrk Sprr  ( =d=d==== )
-	OVR2            Ssx INC2k     INC2  Ssy STHrk Sprr  ( ==d===== )
-	OVR2 INC2       Ssx INC2k           Ssy STHrk Sprr  ( ======== )
-	OVR2 INC2 INC2  Ssx DUP2            Ssy STHrk Sprr  (  ======  )
-	OVR2 INC2       Ssx DUP2 #0001 SUB2 Ssy STHr  Sprr  (   ====   )
-
-	( Now erase at 4 locations in a 1px rhombus: )      (   ====   )
-	OVR2            Ssx DUP2 #0001 SUB2 Ssy #00 Sprr    (  =e   =  )
-	OVR2 #0001 SUB2 Ssx DUP2            Ssy #00 Sprr    ( =e e   = )
-	OVR2            Ssx INC2k           Ssy #00 Sprr    ( = e    = )
-	OVR2 INC2       Ssx DUP2            Ssy #00 Sprr    ( =      = )
-	                                                    ( =      = )
-	                                                    (  =    =  )
-	POP2 POP2                                           (   ====   )
+	Dbg
+	#0002 SUB2 Ssy
+	#0002 SUB2 Ssx
+	;s3x3_border Ssa
+	Aut2ay
+	#02 .on LDZ SUB Sprrr
+	Dbg
 JMP2r
 
 @chords
@@ -356,9 +343,6 @@ JMP2r
 @s1x2_m
 	0000 0000 0000 00b6
 	dbdb dbdb db00 0000
-@s2x1_solid
-	ffff ffff ffff ffff
-	ffff ffff ffff ffff
 @s1x2_sdim
 	0000 0003 1e37 3f3b
 	1e30 0000 0000 0000
@@ -377,6 +361,16 @@ JMP2r
 @s1x2_iir
 	0000 0006 860c 0c0c
 	1818 1830 b030 0000
+@s3x3_border
+	3f40 8080 8080 8080
+	ff00 0000 0000 0000
+	c020 1010 1010 1010
+	8080 8080 8080 8080
+	0000 0000 0000 0000
+	1010 1010 1010 1010
+	8080 403f 0000 0000
+	0000 00ff 0000 0000
+	1010 20c0 0000 0000
 
 @saw-wave
 	80 88 90 98 a0 a8 b0 b8 c0 c8 d0 d8 e0 e8 f0 f8
