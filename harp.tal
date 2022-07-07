@@ -224,26 +224,24 @@ JMP2r
 	( Draw the note name, shifted 1px right if accidental = blank: )
 	ROT2 #20 SFT2 ;note-table ADD2 ( x* y* &name )
 	LDA2k Ssa  ( x* y* &name )
-	INC2 INC2  ( x* y* &acc )
-	ROT2k SWP2  ( x* y* &acc y* x* &acc )
-	;s1x1_blank EQU2 Ext  ( x* y* &acc y* x* acc=blank )
-	ADD2 Ssx Ssy  ( x* y* &acc )
+	INC2 INC2 LDA2  ( x* y* acc )
+	ROT2k SWP2  ( x* y* acc y* x* acc )
+	;s1x1_blank EQU2 Ext  ( x* y* acc y* x* acc=blank )
+	ADD2 Ssx Ssy  ( x* y* acc )
 	Aut1ay STHrk Sprr
 
 	( Draw the accidental: )
-	LDA2 Ssa Ssy
+	Ssa Ssy
 	#0008 ADD2 Ssx
 	Aut0 STHr #40 ORA Spr
 JMP2r
 
 @draw-border ( x* y* -> )
-	Dbg
 	#0002 SUB2 Ssy
 	#0002 SUB2 Ssx
 	;s3x3_border Ssa
 	Aut2ay
 	#02 .on LDZ SUB Sprrr
-	Dbg
 JMP2r
 
 @chords
