@@ -242,7 +242,7 @@ JMP2r
 	OVR2 INC2 INC2  Ssx DUP2            Ssy STHrk Sprr  (  ======  )
 	OVR2 INC2       Ssx DUP2 #0001 SUB2 Ssy STHr  Sprr  (   ====   )
 
-	( Now Erase at 4 locations in a 1px rhombus: )      (   ====   )
+	( Now erase at 4 locations in a 1px rhombus: )      (   ====   )
 	OVR2            Ssx DUP2 #0001 SUB2 Ssy #00 Sprr    (  =e   =  )
 	OVR2 #0001 SUB2 Ssx DUP2            Ssy #00 Sprr    ( =e e   = )
 	OVR2            Ssx DUP2 INC2       Ssy #00 Sprr    ( = e    = )
