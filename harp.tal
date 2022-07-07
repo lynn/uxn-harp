@@ -29,11 +29,11 @@
 
 |0000
 @bass
-	&which $2 ( A=0, Bb=1, B=2... no highlight=800x )
-	&slap $2  ( Timer, lower pitch by an octave when it runs out )
+	&which $2 ( A=0, Bb=1, B=2... none=8000 )
+	&time $2  ( Timer, used for slap + label color update )
 @chord
-	&which $2 ( Current chord index, none=ffff )
-	&time $2  ( Timer, used for arpeggio + volume )
+	&which $2 ( Current chord index, none=800 )
+	&time $2  ( Timer, used for arpeggio + volume + label color update )
 
 @on $1 ( for drawing labels )
 
@@ -67,6 +67,22 @@
 	;tri-wave .Audio2/addr DEO2
 	#88 .Audio2/volume DEO
 
+	( Initial draw of chord buttons: )
+	#0000
+	&loop-chord
+	DUP2 #01 ;draw-chord-button JSR2
+	INC2
+	DUP2 #000f LTH2 ,&loop-chord JCN
+	POP2
+
+	( Initial draw of bass buttons: )
+	#0000
+	&loop-note
+	DUP2 #01 ;draw-bass-button JSR2
+	INC2
+	DUP2 #000c LTH2 ,&loop-note JCN
+	POP2
+
 	;on-controller .Controller/vector DEO2
 	;on-screen .Screen/vector DEO2
 BRK
@@ -80,6 +96,7 @@ BRK
 	&bass-loop
 	DUP2 ;bass-keys ADD2 LDA
 	.Controller/key DEI NEQ ,&no-bass JCN
+	.bass/which LDZ2 #00 .on STZ #01 ;draw-bass-button JSR2
 	DUP2 .bass/which STZ2
 	;pluck-bass JSR2
 	&no-bass
@@ -88,7 +105,6 @@ BRK
 
 	( Handle space bar = fifth: )
 	.Controller/key DEI #20 NEQ ,&no-fifth JCN
-	.bass/which LDZ2 #7fff AND2 .bass/which STZ2
 	;pluck-bass JSR2
 	&no-fifth
 
@@ -97,7 +113,9 @@ BRK
 	&chord-loop
 	DUP2 ;chord-keys ADD2 LDA
 	.Controller/key DEI NEQ ,&no-chord JCN
+	.chord/which LDZ2 #00 .on STZ #01 ;draw-chord-button JSR2
 	DUP2 .chord/which STZ2 #0010 .chord/time STZ2
+	DUP2 #01 .on STZ #02 ;draw-chord-button JSR2
 	&no-chord
 	INC2 DUP2 #000f LTH2 ,&chord-loop JCN
 	POP2
@@ -105,89 +123,70 @@ BRK
 
 @pluck-bass ( -> )
 	( Get bass semitones )
-	.bass/which LDZ2 NIP
+	.bass/which LDZ2
+	DUP2 #01 .on STZ #02 ;draw-bass-button JSR2
+	NIP
 
 	( If spacebar was pressed, lower by a fifth: )
 	.Controller/key DEI #20 EQU
 		#07 
 			( Subtract 1 (making a tritone) if chords[current][0] == 6 or 8. )
-			#0140  ( 1<<6 | 1<<8 )
-			.chord/which LDZ2 #30 SFT ;chords ADD2 LDA SFT2 #0001 AND2 #0001 EQU2 SUB
+			.chord/which LDZ2 #30 SFT ;chords ADD2 LDA
+			#06 EQUk ROT ROT INC INC EQU EOR SUB
 		MUL ADD
 
 	( Wrap to an octave )
 	INC INC #0c Mod #37 ADD
 	.Audio0/pitch DEO
 
-	( Set a timer: after 2 frames, drop bass pitch by an octave. )
-	#0002 .bass/slap STZ2
+	( Set a timer: when time=0e, drop bass pitch by an octave. )
+	( When time=0a redraw with labelcolor=1 )
+	#0010 .bass/time STZ2
 JMP2r
 
 @on-screen ( -> )
-	( Draw chord buttons: )
-	#0000
-	&loop-chord
-	DUP2 #0005 Mod2 #0018 MUL2 #0080 ADD2 ( ii xx )
-	OVR2 #0005 DIV2 #0018 MUL2 #0008 ADD2 ( ii xx yy )
-	ROT2k NIP2 NIP2 NIP ( ii xx yy i )
-	;draw-chord-button JSR2 ( ii )
-	INC2
-	DUP2 #000f LTH2 ,&loop-chord JCN
-	POP2
-
-	( Draw bass buttons: )
-	#0000
-	&loop-note
-	STH2k
-	DUP2 #fffc AND2 ( ii ii/4*4 )
-	OVR2 #0003 AND2 #0005 MUL2 ( ii ii/4*3 ii%4*5 )
-	ADD2 INC2 #000c Mod2 ( ii ni )
-	DUP2 #20 SFT2 ;note-table ADD2 LDA2k ( ii ni &notespr notespr )
-	SWP2 INC2 INC2 LDA2 ( ii ni notespr accspr )
-	SWP2 ROT2  ( ii accspr notespr ni )
-	.bass LDZ2 EQU2 Ext  ( ii accspr notespr on* )
-	STH2r DUP2 #0003 AND2 #0018 MUL2 #0008 ADD2 ( ii accspr notespr on ii xx )
-	SWP2 #02 SFT2 #0018 MUL2 #0008 ADD2 ( ii accspr notespr on xx yy )
-	;draw-note-button JSR2 ( ii )
-	INC2
-	DUP2 #000c LTH2 ,&loop-note JCN
-	POP2
-
 	( Play chord arpeggio: )
 	.chord/time LDZ2
 	DUP2 #0000 EQU2 ,&chord-silent JCN
-	DUP2 #0001 AND2 NIP ,&gap JCN
-		DUP2 #0007 AND2 #01 SFT2
-		.chord/which LDZ2 #30 SFT2 ADD2
-		DUP2    ;chords ADD2 LDA Ext .bass/which LDZ2 ADD2 NIP #0c Mod #45 ADD .Audio1/pitch DEO
-		#02 EOR ;chords ADD2 LDA Ext .bass/which LDZ2 ADD2 NIP #0c Mod #45 ADD .Audio2/pitch DEO
-	&gap
-	DUP2 NIP #01 SUB #40 SFT .Audio1/volume DEO
-	DUP2 NIP #01 SUB #01 MUL .Audio2/volume DEO
-	DUP2 #0001 SUB2 .chord/time STZ2
+		DUP2 #000a NEQ2 ,&no-unflash JCN
+			.chord/which LDZ2 #01 .on STZ #01 ;draw-chord-button JSR2
+		&no-unflash
+		DUP2 #0001 AND2 NIP ,&no-arp JCN
+			DUP2 #0007 AND2 #01 SFT2
+			.chord/which LDZ2 #30 SFT2 ADD2
+			DUP2    ;chords ADD2 LDA Ext .bass/which LDZ2 ADD2 NIP #0c Mod #45 ADD .Audio1/pitch DEO
+			#02 EOR ;chords ADD2 LDA Ext .bass/which LDZ2 ADD2 NIP #0c Mod #45 ADD .Audio2/pitch DEO
+		&no-arp
+		DUP2 NIP #01 SUB #40 SFT .Audio1/volume DEO
+		DUP2 NIP #01 SUB #01 MUL .Audio2/volume DEO
+		DUP2 #0001 SUB2 .chord/time STZ2
 	&chord-silent
 	POP2
 
-	.bass/slap LDZ2
-	DUP2 #0000 EQU2 ,&no-slap JCN
-	#0001 SUB2 DUP2 .bass/slap STZ2
-	ORAk ,&no-slap-effect JCN
-	.Audio0/pitch DEI #0c SUB .Audio0/pitch DEO
-	.bass/which LDZ2 #8000 ORA2 .bass/which STZ2
-	&no-slap-effect
-	&no-slap
+	.bass/time LDZ2
+	DUP2 #0000 EQU2 ,&bass-silent JCN
+		#0001 SUB2 DUP2 .bass/time STZ2
+		DUP2 #000e NEQ2 ,&no-slap-effect JCN
+			.Audio0/pitch DEI #0c SUB .Audio0/pitch DEO
+		&no-slap-effect
+		DUP2 #000a NEQ2 ,&no-unflash-bass JCN
+			.bass/which LDZ2 #01 .on STZ #01 ;draw-bass-button JSR2
+		&no-unflash-bass
+	&bass-silent
 	POP2
 BRK
 
-@draw-chord-button ( x* y* num -> )
-	( Draw a border at x,y )
-	STH OVR2 OVR2
-	STHrk Ext .chord LDZ2 EQU2 .chord/time LDZ2 #000c GTH2 AND
-	DUP .on STZ
-	;draw-border JSR2 STHr
+@draw-chord-button ( num* labelcolor -> )
+	STH
+	( Redraw the button for the num-th chord. )
+	( x = 0x80 + num%5 * 0x18 )
+	DUP2 #0005 Mod2 #0018 MUL2 #0080 ADD2  ( num* x* )
+	( y = 0x08 + num/5 * 0x18 )
+	OVR2 #0005 DIV2 #0018 MUL2 #0008 ADD2  ( num* x* y* )
 
-	#30 SFT Ext      ( x* y* 8num* )
-	SWP2 Ssy         ( x* 8num* )
+	OVR2 OVR2 ;draw-border JSR2
+	Ssy SWP2         ( x* num* )
+	#30 SFT2         ( x* 8num* )
 	Aut0ay           ( x* 8num* )
 	;chords/l ADD2   ( x* &lsprt )
 	INC2k INC2 LDA2  ( x* &lsprt rsprt )
@@ -196,7 +195,7 @@ BRK
 		( Draw the right 1x2 sprite at [x+8,y]. )
 		Ssa                  ( x* &lsprt )
 		OVR2 #0008 ADD2 Ssx  ( x* &lsprt )
-		#01 .on LDZ ADD Sprr ( x* &lsprt )
+		STHrk Sprr           ( x* &lsprt )
 		.Screen/y DEI2 #0010 SUB2 Ssy
 		,&draw-left JMP
 	&no-right
@@ -205,30 +204,38 @@ BRK
 	&draw-left
 	LDA2 Ssa
 	Ssx
-	#01 .on LDZ ADD Sprr
+	STHr Sprr
 JMP2r
 
-@draw-note-button ( accspr* notespr* on* x* y* -> )
-	( Draw the button border )
-	ROT2k NIP         ( acc* note* on* x* y* x* y* on )
-	DUP .on STZ
-	;draw-border JSR2 ( acc* note* on* x* y* )
-	ROT2 POP2         ( acc* note* x* y* )
+@draw-bass-button ( num* labelcol -> )
+	STH
+	DUP2 #8000 NEQ2 ,&not-none JCN STHr POP POP2 JMP2r &not-none
+	( Draw the note button for semitone num )
+	( x = 0x08 + 0x18 * [n+3&3] )
+	( y = 0x08 + 0x18 * [[n+11^3]%3]... don't ask )
+	DUP2 #0003 ADD2 #0003 AND2 #0018 MUL2 #0008 ADD2
+	OVR2 #000b ADD2 #0003 EOR2 #0003 Mod2 #0018 MUL2 #0008 ADD2
+	( num* x* y* )
+
+	OVR2 OVR2 ;draw-border JSR2 ( num* x* y* )
 
 	( Draw the note name, shifted 1px right if accidental = blank: )
-	ROT2 Ssa ( acc x y )
-	ROT2k ;s1x1_blank EQU2 Ext ( acc x y x y acc=blank )
-	ROT2 ADD2 Ssx ( acc x y y )
-	Ssy ( acc x y )
-	Aut1ay #01 .on LDZ ADD Sprr  ( acc x y )
+	ROT2 #20 SFT2 ;note-table ADD2 ( x* y* &name )
+	LDA2k Ssa  ( x* y* &name )
+	INC2 INC2  ( x* y* &acc )
+	ROT2k SWP2  ( x* y* &acc y* x* &acc )
+	;s1x1_blank EQU2 Ext  ( x* y* &acc y* x* acc=blank )
+	ADD2 Ssx Ssy  ( x* y* &acc )
+	Aut1ay STHrk Sprr
 
 	( Draw the accidental: )
-	Ssy #0008 ADD2 Ssx Ssa ( )
-	Aut0 #41 .on LDZ ADD Spr
+	LDA2 Ssa Ssy
+	#0008 ADD2 Ssx
+	Aut0 STHr #40 ORA Spr
 JMP2r
 
-@draw-border ( x* y* on -> )
-	#02 SWP SUB STH
+@draw-border ( x* y* -> )
+	#02 .on LDZ SUB STH
 	;s2x1_solid Ssa
 
 	( Stamp the border-color at 8 locations in a 2px rhombus around x,y: )
