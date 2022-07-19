@@ -39,6 +39,8 @@
 
 @on $1 ( for drawing labels )
 
+@pointer &x $2 &y $2 &down $1
+
 ( program )
 
 |0100 ( -> )
@@ -72,10 +74,10 @@
 
 	( Initial draw of bass buttons: )
 	#0000
-	&loop-note
+	&loop-bass
 	DUP2 #01 ;draw-bass-button JSR2
 	INC2
-	DUP2 #000c LTH2 ,&loop-note JCN
+	DUP2 #000c LTH2 ,&loop-bass JCN
 	POP2
 
 	;on-controller .Controller/vector DEO2
@@ -107,9 +109,7 @@ BRK
 	&chord-loop
 	DUP2 ;chord-keys ADD2 LDA
 	.Controller/key DEI NEQ ,&no-chord JCN
-	.chord/which LDZ2 #00 .on STZ #01 ;draw-chord-button JSR2
-	DUP2 .chord/which STZ2 #0010 .chord/time STZ2
-	DUP2 #01 .on STZ #02 ;draw-chord-button JSR2
+	DUP2 ;set-chord JSR2
 	&no-chord
 	INC2 DUP2 #000f LTH2 ,&chord-loop JCN
 	POP2
@@ -121,11 +121,48 @@ BRK
 	;pluck-bass JSR2
 JMP2r
 
+@set-chord ( chord* -> )
+	.chord/which LDZ2 #00 .on STZ #01 ;draw-chord-button JSR2
+	.chord/which STZ2 #0010 .chord/time STZ2
+	DUP2 #01 .on STZ #02 ;draw-chord-button JSR2
+JMP2r
+
+
 @on-mouse
-	.Mouse/state DEI ,&yes-mouse JCN BRK
+	;s1x1_mouse Ssa Aut0
+	.pointer/x LDZ2 Ssx
+	.pointer/y LDZ2 Ssy
+	#40 Spr
+	.Mouse/x DEI2 DUP2 .pointer/x STZ2 Ssx
+	.Mouse/y DEI2 DUP2 .pointer/y STZ2 Ssy
+	#41 Spr
+	.pointer/down LDZ
+	.Mouse/state DEI #01 AND   DUP .pointer/down STZ
+	LTH ,&yes-mouse JCN BRK
 	&yes-mouse
-	( .Mouse/y DEI2 #000e Mod2 ;set-bass JSR2 )
-	( TODO )
+
+	#0000
+	&loop-bass
+	( n* )
+	DUP2 #20 SFT2 ;bass-button-positions ADD2 LDA2k #0003 SUB2 ( n* addr* x* )
+	.Mouse/x DEI2 SUB2 #ffec LTH2 STH  ( n* addr* )
+	INC2 INC2 LDA2 #0003 SUB2 .Mouse/y DEI2 SUB2 #ffec LTH2 STHr ORA  ( n* nomatch )
+	,&nob JCN DUP2 ;set-bass JSR2 &nob
+	INC2
+	DUP2 #000c LTH2 ,&loop-bass JCN
+	POP2
+
+	#0000
+	&loop-chord
+	( n* )
+	DUP2 #20 SFT2 ;chord-button-positions ADD2 LDA2k #0003 SUB2 ( n* addr* x* )
+	.Mouse/x DEI2 SUB2 #ffec LTH2 STH  ( n* addr* )
+	INC2 INC2 LDA2 #0003 SUB2 .Mouse/y DEI2 SUB2 #ffec LTH2 STHr ORA  ( n* nomatch )
+	,&noc JCN DUP2 ;set-chord JSR2 &noc
+	INC2
+	DUP2 #000f LTH2 ,&loop-chord JCN
+	POP2
+
 BRK
 
 @pluck-bass ( -> )
@@ -187,6 +224,12 @@ JMP2r
 	POP2
 BRK
 
+@chord-button-positions
+	( array of 15 x/y pairs )
+	$4 $4 $4 $4 $4
+	$4 $4 $4 $4 $4
+	$4 $4 $4 $4 $4
+
 @draw-chord-button ( num* labelcolor -> )
 	STH
 	( Redraw the button for the num-th chord. )
@@ -194,6 +237,11 @@ BRK
 	DUP2 #0005 Mod2 #0018 MUL2 #0080 ADD2  ( num* x* )
 	( y = 0x08 + num/5 * 0x18 )
 	OVR2 #0005 DIV2 #0018 MUL2 #0008 ADD2  ( num* x* y* )
+
+	( Store this button position for mouse input: )
+	ROT2k #20 SFT2 ;chord-button-positions ADD2  ( num* x* y* x* y* xaddr )
+	ROT2 SWP2 STA2k NIP2  ( num* x* y* y* xaddr )
+	INC2 INC2 STA2        ( num* x* y* )
 
 	OVR2 OVR2 ;draw-border JSR2
 	Ssy SWP2         ( x* num* )
@@ -218,6 +266,12 @@ BRK
 	STHr Sprr
 JMP2r
 
+@bass-button-positions
+	( array of 12 x/y pairs )
+	$4 $4 $4 $4
+	$4 $4 $4 $4
+	$4 $4 $4 $4
+
 @draw-bass-button ( num* labelcol -> )
 	STH
 	DUP2 #8000 NEQ2 ,&not-none JCN STHr POP POP2 JMP2r &not-none
@@ -228,21 +282,16 @@ JMP2r
 	OVR2 #000b ADD2 #0003 EOR2 #0003 Mod2 #0018 MUL2 #0008 ADD2
 	( num* x* y* )
 
+	( Store this button position for mouse input: )
+	ROT2k #20 SFT2 ;bass-button-positions ADD2  ( num* x* y* x* y* xaddr )
+	ROT2 SWP2 STA2k NIP2  ( num* x* y* y* xaddr )
+	INC2 INC2 STA2        ( num* x* y* )
+
 	OVR2 OVR2 ;draw-border JSR2 ( num* x* y* )
-
-	( Draw the note name, shifted 1px right if accidental = blank: )
-	ROT2 #20 SFT2 ;note-table ADD2 ( x* y* &name )
-	LDA2k Ssa  ( x* y* &name )
-	INC2 INC2 LDA2  ( x* y* acc )
-	ROT2k SWP2  ( x* y* acc y* x* acc )
-	;s1x1_blank EQU2 Ext  ( x* y* acc y* x* acc=blank )
-	ADD2 Ssx Ssy  ( x* y* acc )
-	Aut1ay STHrk Sprr
-
-	( Draw the accidental: )
-	Ssa Ssy
-	#0008 ADD2 Ssx
-	Aut0 STHr #40 ORA Spr
+	Ssy SWP2 #50 SFT2 ;s2x2_note ADD2 DUP2 Ssa ( x* addr )
+	( Draw 1px to the right if the sprite has an accidental, detected as spr[8] != 0: )
+	#0008 ADD2 LDA #00 EQU Ext ADD2 Ssx ( )
+	Aut1ay STHr Sprr
 JMP2r
 
 @draw-border ( x* y* -> )
@@ -275,17 +324,17 @@ JMP2r
 
 @note-table
 	:s2x2_note/a  :s1x1_blank
-	:s2x2_note/b  :s1x1_flat
+	:s2x2_note/bb :s1x1_blank
 	:s2x2_note/b  :s1x1_blank
 	:s2x2_note/c  :s1x1_blank
-	:s2x2_note/d  :s1x1_flat
+	:s2x2_note/db :s1x1_blank
 	:s2x2_note/d  :s1x1_blank
-	:s2x2_note/e  :s1x1_flat
+	:s2x2_note/eb :s1x1_blank
 	:s2x2_note/e  :s1x1_blank
 	:s2x2_note/f  :s1x1_blank
-	:s2x2_note/f  :s1x1_sharp
+	:s2x2_note/fs :s1x1_blank
 	:s2x2_note/g  :s1x1_blank
-	:s2x2_note/a  :s1x1_flat
+	:s2x2_note/ab :s1x1_blank
 
 @s2x2_note
 &a
@@ -293,6 +342,11 @@ JMP2r
 	0000 0000 0080 80c0
 	1010 3f20 4040 e000
 	c060 e030 3018 3c00
+&bb
+	0000 ff61 6060 6061
+	0808 0e8a cacc 8800
+	7f61 6060 6061 ff00
+	0080 c0c0 c080 0000
 &b
 	0000 ff61 6060 6061
 	0000 0080 c0c0 8000
@@ -303,11 +357,21 @@ JMP2r
 	0000 e0e0 6060 0000
 	c0c0 c0c0 6030 1f00
 	0000 0000 60c0 8000
+&db
+	0000 ff61 6060 6060
+	0808 0e8a ca6c 6860
+	6060 6060 6061 ff00
+	6060 6060 c080 0000
 &d
 	0000 ff61 6060 6060
 	0000 0080 c060 6060
 	6060 6060 6061 ff00
 	6060 6060 c080 0000
+&eb
+	0000 ff60 6060 6061
+	0808 ee6a 0a0c 0800
+	7f61 6060 6060 ff00
+	0000 0000 0060 e000
 &e
 	0000 ff60 6060 6061
 	0000 e060 0000 0000
@@ -318,15 +382,21 @@ JMP2r
 	0000 e060 0000 0000
 	7f61 6060 6060 f000
 	0000 0000 0000 0000
+&fs
+	0000 ff60 6060 6061
+	0a1f ea6a 1f0a 0000
+	7f61 6060 6060 f000
+	0000 0000 0000 0000
 &g
 	0000 1f30 60c0 c0c0
 	0000 e0e0 6060 0000
 	c0c1 c0c0 6030 1f00
 	00f0 6060 60e0 6000
-@s1x1_flat
-	0808 0e0a 0a0c 0800
-@s1x1_sharp
-	0a1f 0a0a 1f0a 0000
+&ab
+	0000 0203 0705 0908
+	0808 0e0a 0a8c 88c0
+	1010 3f20 4040 e000
+	c060 e030 3018 3c00
 @s1x2_7
 	0000 0000 7e46 060c
 	0c18 1830 3000 0000
@@ -376,6 +446,8 @@ JMP2r
 	8080 403f 0000 0000
 	0000 00ff 0000 0000
 	1010 20c0 0000 0000
+@s1x1_mouse
+	80c0 e0f0 c020 0000
 
 @saw-wave
 	80 88 90 98 a0 a8 b0 b8 c0 c8 d0 d8 e0 e8 f0 f8
